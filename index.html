@@ -1,0 +1,46 @@
+<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSY – Integrace informací (pilot v2)</title><style>:root{font-family:system-ui,Arial,sans-serif;color:#1d2939;background:#f6f8fb}body{max-width:900px;margin:35px auto;padding:0 18px}main{background:white;border-radius:15px;padding:28px;box-shadow:0 5px 30px #12223a13}h1{font-size:1.65rem}p{line-height:1.6}.muted{color:#667085}.document{background:#f8fafc;border:1px solid #d9e1eb;border-radius:10px;padding:20px;margin:20px 0;line-height:1.75}.document p{margin:0 0 14px}input{padding:12px;font-size:1rem;border:1px solid #9eacbb;border-radius:8px;max-width:100%;box-sizing:border-box}button{padding:12px 20px;background:#175cd3;color:white;border:0;border-radius:8px;cursor:pointer;font-weight:650}button:disabled{opacity:.45;cursor:not-allowed}.hidden{display:none}.pill{display:inline-block;background:#e9f0ff;border-radius:30px;padding:5px 11px;font-size:.82rem}#progress{font-weight:650}.question{font-weight:700;font-size:1.1rem}#error{color:#b42318}.note{background:#fff8e7;padding:12px;border-radius:8px}a{color:#175cd3}</style></head><body><main><h1>Integrace informací v textu</h1><p class="muted">Pilotní experiment KSY · verze 2 · čeština</p><section id="intro"><p>Budete číst 12 krátkých dokumentů a odpovídat na otázky. Dokument zůstane během odpovídání viditelný. Odpovídejte pouze podle uvedeného textu, bez externích pomůcek.</p><p>Každý příběh uvidíte pouze jednou. Pořadí úloh a rozmístění informací se mezi účastníky mění.</p><label for="pid">Anonymní kód účastníka:</label><p><input id="pid" placeholder="např. U001" autocomplete="off"></p><button id="start">Začít experiment</button><p class="muted">Nezadávejte jméno ani jiné osobní údaje. Výsledky se ukládají pouze v tomto prohlížeči během relace; na server se neodesílají.</p></section><section id="trial" class="hidden"><p><span class="pill" id="progress"></span> <span class="pill" id="level"></span></p><div id="doc" class="document"></div><p class="question" id="question"></p><form id="answerForm"><input id="answer" type="number" step="1" required placeholder="Číselná odpověď" aria-label="Odpověď"><button type="submit">Odeslat odpověď</button></form><p id="error"></p></section><section id="finish" class="hidden"><h2>Hotovo, děkujeme!</h2><p id="summary"></p><p class="note">Stáhněte CSV a předejte jej výzkumníkovi. CSV obsahuje anonymní kód, variantu, odpovědi, správnost a dobu odpovědi. Neobsahuje osobní identifikační údaje.</p><button id="download">Stáhnout výsledky CSV</button><p><button id="restart" style="background:#475467">Nový účastník</button></p></section></main><script>
+'use strict';
+const fillers=[
+'Místní muzeum připravuje výstavu historických map a keramiky.',
+'Na hlavním náměstí se každoročně koná knižní trh.',
+'Botanická zahrada představila novou sbírku horských rostlin.',
+'Dobrovolníci v knihovně katalogizují staré časopisy.',
+'Pobřežní tým zaznamenává směr větru a změny počasí.',
+'Veřejný park je známý duby a dřevěnými lavičkami.',
+'Studenti organizují fotografickou výstavu o architektuře.',
+'Městské divadlo uvádí představení o cestování.',
+'Kulturní centrum pořádá pravidelné výtvarné dílny.'
+];
+// Each scenario contains 1, 2 or 3-4 distinct facts. Every participant sees each scenario only once.
+const scenarios=[
+{id:'A1',level:1,facts:['Výzkumná loď Meridia převáží 47 modrých kontejnerů.'],q:'Kolik modrých kontejnerů převáží loď Meridia?',a:47},
+{id:'A2',level:1,facts:['Městský archiv uchovává 63 starých atlasů.'],q:'Kolik starých atlasů uchovává městský archiv?',a:63},
+{id:'A3',level:1,facts:['V zoologické stanici žije 28 želv.'],q:'Kolik želv žije v zoologické stanici?',a:28},
+{id:'A4',level:1,facts:['V přístavním skladu je 54 záchranných vest.'],q:'Kolik záchranných vest je v přístavním skladu?',a:54},
+{id:'B1',level:2,facts:['Anna měla na účtu 40 000 korun.','Anna dostala dalších 10 000 korun a nic neutratila.'],q:'Kolik korun má Anna na účtu po připsání peněz?',a:50000},
+{id:'B2',level:2,facts:['Petr měl ve skladu 35 balíků.','Petr odeslal ze skladu 12 balíků a žádné nové nepřijal.'],q:'Kolik balíků Petrovi ve skladu zůstalo?',a:23},
+{id:'B3',level:2,facts:['Školní knihovna měla 80 knih v jedné kolekci.','Knihovna do této kolekce přidala 17 knih a žádnou nevyřadila.'],q:'Kolik knih má kolekce nyní?',a:97},
+{id:'B4',level:2,facts:['Na farmě bylo ráno 46 pytlů obilí.','Odpoledne přivezli dalších 19 pytlů a žádné neodvezli.'],q:'Kolik pytlů obilí je na farmě odpoledne?',a:65},
+{id:'C1',level:4,facts:['Město Lira má severní, jižní a západní sklad.','Severní sklad má 12 beden.','Jižní sklad má o 5 beden více než severní.','Západní sklad má o 3 bedny méně než jižní.'],q:'Kolik beden je celkem ve všech třech skladech?',a:43},
+{id:'C2',level:4,facts:['Škola má tři skupiny: červenou, modrou a zelenou.','Červená skupina má 14 studentů.','Modrá skupina má o 6 studentů více než červená.','Zelená skupina má o 4 studenty méně než modrá.'],q:'Kolik studentů je celkem ve třech skupinách?',a:50},
+{id:'C3',level:4,facts:['Dopravce používá tři vozy: A, B a C.','Vůz A veze 18 balíků.','Vůz B veze o 7 balíků méně než vůz A.','Vůz C veze o 5 balíků více než vůz B.'],q:'Kolik balíků vezou všechny tři vozy dohromady?',a:45},
+{id:'C4',level:4,facts:['Sportovní klub má tři týmy: Alfa, Beta a Gama.','Tým Alfa získal 21 bodů.','Tým Beta získal o 8 bodů méně než Alfa.','Tým Gama získal o 3 body více než Beta.'],q:'Kolik bodů získaly všechny tři týmy dohromady?',a:50}
+];
+let participant='',seed=0,plan=[],index=0,started=0,results=[];
+function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function random(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
+function shuffle(a){a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function renderDoc(s,condition){let slots=Array(11).fill(null),facts=s.facts;
+if(condition==='grouped'){const first=2+Math.floor(random()*Math.max(1,8-facts.length));facts.forEach((f,i)=>slots[first+i]=f)}
+else if(facts.length===1){slots[2+Math.floor(random()*7)]=facts[0]}
+else {const locations=facts.length===2?[1,9]:[1,3,7,9];facts.forEach((f,i)=>slots[locations[i]]=f)}
+let fillerIndex=0, fillerSet=shuffle(fillers);return slots.map(f=>'<p>'+ (f||fillerSet[(fillerIndex++)%fillerSet.length])+'</p>').join('')}
+function next(){if(index>=plan.length){finish();return}let item=plan[index];document.getElementById('progress').textContent=`Úloha ${index+1} / ${plan.length}`;document.getElementById('level').textContent=`Počet faktů: ${item.level}`;document.getElementById('doc').innerHTML=item.document;document.getElementById('question').textContent='Otázka: '+item.q;document.getElementById('answer').value='';document.getElementById('error').textContent='';document.getElementById('answer').focus();started=performance.now()}
+function csvEscape(v){let s=String(v??'');return /[",\n]/.test(s)?'"'+s.replaceAll('"','""')+'"':s}
+function csv(){let cols=['participant','scenario','level','condition','order','answer','correct_answer','correct','response_time_ms','document'];return '\uFEFF'+[cols.join(','),...results.map(r=>cols.map(c=>csvEscape(r[c])).join(','))].join('\r\n')}
+function finish(){document.getElementById('trial').classList.add('hidden');document.getElementById('finish').classList.remove('hidden');let correct=results.filter(r=>r.correct).length;document.getElementById('summary').textContent=`Dokončeno ${results.length} úloh. Správných odpovědí: ${correct} z ${results.length}.`}
+document.getElementById('start').onclick=()=>{participant=document.getElementById('pid').value.trim();if(!participant){alert('Zadejte anonymní kód účastníka.');return}seed=hash(participant)||1;const perLevel={1:[],2:[],4:[]};scenarios.forEach(s=>perLevel[s.level].push(s));let prepared=[];for(const [level,arr] of Object.entries(perLevel)){let randomized=shuffle(arr);randomized.forEach((s,i)=>{let condition=(i+(hash(participant+'-'+level)%2))%2===0?'grouped':'distributed';prepared.push({...s,condition,document:renderDoc(s,condition)})})}plan=shuffle(prepared);index=0;results=[];document.getElementById('intro').classList.add('hidden');document.getElementById('trial').classList.remove('hidden');next()};
+document.getElementById('answerForm').onsubmit=e=>{e.preventDefault();let raw=document.getElementById('answer').value.trim();if(raw==='')return;let item=plan[index];results.push({participant,scenario:item.id,level:item.level,condition:item.condition,order:index+1,answer:Number(raw),correct_answer:item.a,correct:Number(raw)===item.a?1:0,response_time_ms:Math.round(performance.now()-started),document:item.document.replace(/<\/?p>/g,' ').trim()});index++;next()};
+document.getElementById('download').onclick=()=>{let blob=new Blob([csv()],{type:'text/csv;charset=utf-8'});let url=URL.createObjectURL(blob);let a=document.createElement('a');a.href=url;a.download=`KSY_${participant.replace(/[^a-z0-9_-]/gi,'_')}_v2.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+document.getElementById('restart').onclick=()=>location.reload();
+</script></body></html>
